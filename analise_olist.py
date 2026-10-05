@@ -11,6 +11,9 @@
 # %% Imports
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")  # salva os gráficos em arquivo, sem abrir janelas
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -57,38 +60,43 @@ df = (
 df["receita"] = df["price"]  # sem frete
 df["mes"] = df["order_purchase_timestamp"].dt.to_period("M").dt.to_timestamp()
 df["categoria"] = df["product_category_name_english"].fillna("outros")
+receita_total = df["receita"].sum()
 
 # %% 4. Receita e pedidos por mês
 mensal = df.groupby("mes").agg(
     receita=("receita", "sum"), pedidos=("order_id", "nunique")
 )
-ax = mensal["receita"].plot(figsize=(10, 4), marker="o", title="Receita mensal (R$)")
-ax.set_xlabel("")
-plt.tight_layout()
-plt.savefig(IMG / "receita_mensal.png", dpi=150)
-plt.show()
+
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.plot(mensal.index, mensal["receita"], marker="o")
+ax.set_title("Receita mensal (R$)")
+fig.tight_layout()
+fig.savefig(IMG / "receita_mensal.png", dpi=150)
+plt.close(fig)
 
 # %% 5. Top 10 categorias por receita
-top_cat = (
-    df.groupby("categoria")["receita"].sum().sort_values(ascending=False).head(10)
-)
-ax = top_cat.sort_values().plot(
-    kind="barh", figsize=(8, 5), title="Top 10 categorias por receita (R$)"
-)
+top_cat = df.groupby("categoria")["receita"].sum().sort_values(ascending=False).head(10)
+
+fig, ax = plt.subplots(figsize=(8, 5))
+top_cat.sort_values().plot(kind="barh", ax=ax)
+ax.set_title("Top 10 categorias por receita (R$)")
 ax.set_ylabel("")
-plt.tight_layout()
-plt.savefig(IMG / "top_categorias.png", dpi=150)
-plt.show()
+fig.tight_layout()
+fig.savefig(IMG / "top_categorias.png", dpi=150)
+plt.close(fig)
 
 # %% 6. Receita por estado
 por_estado = (
     df.groupby("customer_state")["receita"].sum().sort_values(ascending=False).head(10)
 )
-ax = por_estado.plot(kind="bar", figsize=(8, 4), title="Top 10 estados por receita (R$)")
+
+fig, ax = plt.subplots(figsize=(8, 4))
+por_estado.plot(kind="bar", ax=ax)
+ax.set_title("Top 10 estados por receita (R$)")
 ax.set_xlabel("")
-plt.tight_layout()
-plt.savefig(IMG / "receita_por_estado.png", dpi=150)
-plt.show()
+fig.tight_layout()
+fig.savefig(IMG / "receita_por_estado.png", dpi=150)
+plt.close(fig)
 
 # %% 7. Ticket médio (receita por pedido)
 ticket_medio = df.groupby("order_id")["receita"].sum().mean()
@@ -103,17 +111,28 @@ nota = entregas.groupby("atrasou")["review_score"].mean()
 print(nota)
 print(f"% de pedidos atrasados: {entregas['atrasou'].mean():.1%}")
 
-ax = nota.rename({False: "No prazo", True: "Atrasou"}).plot(
-    kind="bar", figsize=(5, 4), title="Nota média por entrega"
-)
+fig, ax = plt.subplots(figsize=(5, 4))
+nota.rename({False: "No prazo", True: "Atrasou"}).plot(kind="bar", ax=ax)
+ax.set_title("Nota média por entrega")
 ax.set_xlabel("")
-plt.xticks(rotation=0)
-plt.tight_layout()
-plt.savefig(IMG / "nota_por_atraso.png", dpi=150)
-plt.show()
+ax.tick_params(axis="x", rotation=0)
+fig.tight_layout()
+fig.savefig(IMG / "nota_por_atraso.png", dpi=150)
+plt.close(fig)
 
-# %% 9. Conclusões (preencha com os SEUS números, depois de rodar)
-# - Receita cresceu X% entre jan/2017 e ago/2018
-# - As 3 categorias que mais vendem são: ...
-# - SP concentra X% da receita
-# - Pedidos atrasados têm nota média X vs Y dos entregues no prazo
+# %% 9. Números extras para o README
+pct_sp = por_estado.iloc[0] / receita_total
+print(f"Estado líder: {por_estado.index[0]} com {pct_sp:.1%} da receita")
+
+print("Participação das 3 maiores categorias:")
+print((top_cat.head(3) / receita_total).round(3))
+print(f"As 3 juntas: {top_cat.head(3).sum() / receita_total:.1%}")
+
+# Crescimento ano contra ano, comparando os mesmos meses (jan-ago)
+r2017 = mensal.loc["2017-01":"2017-08", "receita"].sum()
+r2018 = mensal.loc["2018-01":"2018-08", "receita"].sum()
+print(f"Jan-Ago 2017: R$ {r2017:,.0f}")
+print(f"Jan-Ago 2018: R$ {r2018:,.0f}")
+print(f"Crescimento: {r2018 / r2017 - 1:.0%}")
+
+print("Gráficos salvos na pasta images/")
